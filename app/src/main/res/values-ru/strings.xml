@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">Step Info</string>
+    <string name="nav_header_title">Step Info</string>
+    <string name="nav_header_desc">Фотография пользователя</string>
+    <string name="action_settings">Настройки</string>
+
+    <string name="menu_statistics">Статистика</string>
+    <string name="menu_settings">Настройки</string>
+    <string name="menu_tracker">Трекер</string>
+    <string name="no_sensor">Датчик не найден</string>
+    <string name="no_sensor_explain">Данному приложению требуется аппаратный датчик шагов, которого нет в вашем устройстве. Это приложение не будет работать на вашем устройстве.</string>
+    <string name="steps">шагов</string>
+    <string name="km">км</string>
+    <string name="mi">миль</string>
+    <string name="calorie">калории : %1$d ккал</string>
+    <string name="step_size">Размер шага</string>
+    <string name="weight_size">Вес</string>
+    <string name="goal_summary">Текущая цель: %,d шагов</string>
+    <string name="step_size_summary">Текущий размер шага: %1$.2f %2$s</string>
+    <string name="weight_summary">Текущий вес: %1$,d кг.</string>
+    <string name="goal">Цель</string>
+    <string name="set_goal">Установить цель</string>
+    <string name="goal_reached_notification">Цель достигнута! %s шагов и их число растёт</string>
+    <string name="notification_text">%s шагов до цели</string>
+    <string name="your_progress_will_be_shown_here_soon">Скоро тут появится количество шагов</string>
+    <string name="notification_title">Step Info считает шаги</string>
+</resources>
