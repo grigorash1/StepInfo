@@ -4,16 +4,24 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.graphics.drawable.Drawable;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Binder;
+import android.speech.tts.TextToSpeech;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
+
+import org.eazegraph.lib.utils.Utils;
 
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -21,15 +29,21 @@ import java.util.Locale;
 import ru.grigorash.stepinfo.MainActivity;
 import ru.grigorash.stepinfo.R;
 import ru.grigorash.stepinfo.dao.StatisticDatabase;
+import ru.grigorash.stepinfo.track.TrackRecorder;
 import ru.grigorash.stepinfo.ui.settings.SettingsViewModel;
 import ru.grigorash.stepinfo.utils.API26Wrapper;
+import ru.grigorash.stepinfo.utils.CommonUtils;
 
 import static ru.grigorash.stepinfo.utils.CommonUtils.getCurrentDate;
 
 public class SensorListenerSvc extends Service implements StepCounterEventListener.IStepCounterListenerConsumer
 {
-    public final static String ACTION_NAME = "ON_STEP";
+    public final static String ACTION_ON_STEP = "ru.StepInfo.ON_STEP";
     public final static String STEP_SECTION_NAME = "TODAY_STEP_COUNT";
+
+    public final static String ACTION_TRACK_START_REC = "ru.StepInfo.TRACK_START_REC";
+    public final static String ACTION_TRACK_PAUSE_REC = "ru.StepInfo.TRACK_PAUSE_REC";
+    public final static String ACTION_TRACK_STOP_REC = "ru.StepInfo.TRACK_STOP_REC";
 
     private final static int NOTIFICATION_ID = 1;
     private final static int SAVE_INTERVAL = 30 * 1000;
@@ -42,38 +56,52 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
     private long     m_last_save_date;
     private boolean  m_steps_changed;
     private StepCounterEventListener m_sensor_listener;
+    private TextToSpeech m_tts;
+    private boolean m_ttsEnabled;
+    private BroadcastReceiver m_broadcastReceiver;
+    private TrackRecorder m_track_recorder;
+    private IBinder m_binder;
+
+    public class LocalBinder extends Binder
+    {
+        public SensorListenerSvc getServerInstance()
+        {
+            return SensorListenerSvc.this;
+        }
+    }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent)
     {
-        return null;
+        return m_binder;
     }
 
     @Override
     public void onCreate()
     {
         super.onCreate();
+        m_binder = new LocalBinder();
         m_sensor_listener = new StepCounterEventListener(this);
         m_db = StatisticDatabase.getInstance(this);
         m_total_today_steps = m_db.getTodaySteps();
+        initTextToSpeech();
+        initBroadcastReceiver();
         sendDataToGUI();
         m_save_handler = new Handler();
         // save current steps count to Db every SAVE_INTERVAL seconds
-        m_save_worker = new Runnable()
+        m_save_worker = () ->
         {
-            @Override
-            public void run()
+            try
             {
-                try
-                {
-                    saveStepsToDB();
-                    showNotification();
-                }
-                finally
-                {
-                    m_save_handler.postDelayed(m_save_worker, SAVE_INTERVAL);
-                }
+                saveStepsToDB();
+                showNotification();
+                //if (m_ttsEnabled)
+                //    m_tts.speak("" + m_total_today_steps + " преодолено", TextToSpeech.QUEUE_FLUSH, null);
+            }
+            finally
+            {
+                m_save_handler.postDelayed(m_save_worker, SAVE_INTERVAL);
             }
         };
         m_save_worker.run();
@@ -85,7 +113,9 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
         try
         {
             super.onDestroy();
+            unregisterReceiver(m_broadcastReceiver);
             m_save_handler.removeCallbacks(m_save_worker);
+            m_tts.shutdown();
             m_db.close();
         }
         catch (Exception e)
@@ -124,10 +154,78 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
         return START_STICKY;
     }
 
+    private void initBroadcastReceiver()
+    {
+        m_broadcastReceiver = new BroadcastReceiver()
+        {
+            @Override
+            public void onReceive(Context context, Intent intent)
+            {
+                if (LocationManager.PROVIDERS_CHANGED_ACTION.equals(intent.getAction()))
+                {
+                    if (CommonUtils.isGPSEnabled(SensorListenerSvc.this))
+                    {
+                        //location is enabled
+                    }
+                    else
+                    {
+                        //location is disabled
+                    }
+                }
+                else if (ACTION_TRACK_START_REC.equals(intent.getAction()))
+                {
+                    if (m_track_recorder == null)
+                        m_track_recorder = new TrackRecorder(SensorListenerSvc.this);
+                    m_track_recorder.Start();
+                }
+                else if (ACTION_TRACK_PAUSE_REC.equals(intent.getAction()))
+                {
+                    if (m_track_recorder != null)
+                        m_track_recorder.Pause();
+                }
+                else if (ACTION_TRACK_STOP_REC.equals(intent.getAction()))
+                {
+                    if (m_track_recorder != null)
+                    {
+                        m_track_recorder.Stop();
+                        m_track_recorder = null;
+                    }
+                }
+            }
+        };
+
+        IntentFilter filter = new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION);
+        filter.addAction(Intent.ACTION_PROVIDER_CHANGED);
+        filter.addAction(ACTION_TRACK_START_REC);
+        filter.addAction(ACTION_TRACK_PAUSE_REC);
+        filter.addAction(ACTION_TRACK_STOP_REC);
+        registerReceiver(m_broadcastReceiver, filter);
+    }
+
+    private void initTextToSpeech()
+    {
+        m_tts = new TextToSpeech(this, initStatus ->
+        {
+            if (initStatus == TextToSpeech.SUCCESS)
+            {
+                Locale default_locale = new Locale(Locale.getDefault().getLanguage());
+                if (m_tts.isLanguageAvailable(default_locale) == TextToSpeech.LANG_AVAILABLE)
+                    m_tts.setLanguage(default_locale);
+                else
+                    m_tts.setLanguage(Locale.US);
+                m_tts.setPitch(1.3f);
+                m_tts.setSpeechRate(0.7f);
+                m_ttsEnabled = true;
+            }
+            else if (initStatus == TextToSpeech.ERROR)
+                m_ttsEnabled = false;
+        });
+    }
+
     private void sendDataToGUI()
     {
         Intent sendLevel = new Intent();
-        sendLevel.setAction(ACTION_NAME);
+        sendLevel.setAction(ACTION_ON_STEP);
         sendLevel.putExtra(STEP_SECTION_NAME, m_total_today_steps);
         sendBroadcast(sendLevel);
     }
@@ -201,9 +299,9 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
             NumberFormat format = NumberFormat.getInstance(Locale.getDefault());
             notificationBuilder.setProgress(goal, steps, false)
                     .setContentText(
-                    steps >= goal ?
-                            context.getString(R.string.goal_reached_notification, format.format(steps)) :
-                            context.getString(R.string.notification_text, format.format((goal - steps))))
+                            steps >= goal ?
+                                    context.getString(R.string.goal_reached_notification) :
+                                    context.getString(R.string.notification_text, format.format((goal - steps))))
                     .setContentTitle(format.format(steps) + " " + context.getString(R.string.steps));
         }
         else
@@ -211,10 +309,21 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
                     .setContentText(context.getString(R.string.your_progress_will_be_shown_here_soon))
                     .setContentTitle(context.getString(R.string.notification_title));
 
+        if (steps >= goal)
+        {
+            Drawable drawable = context.getResources().getDrawable(R.drawable.ic_race);
+            notificationBuilder.setLargeIcon(CommonUtils.getBitmap(drawable));
+        }
+
         notificationBuilder
                 .setPriority(Notification.PRIORITY_MIN).setShowWhen(false)
                 .setContentIntent(PendingIntent.getActivity(context, 0, new Intent(context, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT))
                 .setSmallIcon(R.drawable.ic_step_info).setOngoing(true);
         return notificationBuilder.build();
+    }
+
+    public boolean isRecordingTrack()
+    {
+        return (m_track_recorder != null) && m_track_recorder.isRecording();
     }
 }

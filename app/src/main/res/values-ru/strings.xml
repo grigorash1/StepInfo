@@ -20,8 +20,12 @@
     <string name="weight_summary">Текущий вес: %1$,d кг.</string>
     <string name="goal">Цель</string>
     <string name="set_goal">Установить цель</string>
-    <string name="goal_reached_notification">Цель достигнута! %s шагов и их число растёт</string>
+    <string name="goal_reached_notification">Цель достигнута!</string>
     <string name="notification_text">%s шагов до цели</string>
     <string name="your_progress_will_be_shown_here_soon">Скоро тут появится количество шагов</string>
     <string name="notification_title">Step Info считает шаги</string>
+    <string name="save_track_title">Трек</string>
+    <string name="save_track_message">Хотите сохранить это трек?</string>
+    <string name="yes">Да</string>
+    <string name="no">Нет</string>
 </resources>
