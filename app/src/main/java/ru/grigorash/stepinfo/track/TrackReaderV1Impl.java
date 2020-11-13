@@ -25,6 +25,8 @@ public class TrackReaderV1Impl implements ITrackReader
         {
             case TrackRecorder.RECORD_POSITION:
                 return new RecordPosition(m_ds, 1);
+            case TrackRecorder.RECORD_STOP:
+                return new RecordStop(m_ds, 1);
             default:
                 throw new IOException(String.format("Unsupported record type: %d", record_type));
         }

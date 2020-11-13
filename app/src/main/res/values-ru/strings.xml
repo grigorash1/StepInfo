@@ -7,6 +7,7 @@
     <string name="menu_statistics">Статистика</string>
     <string name="menu_settings">Настройки</string>
     <string name="menu_tracker">Трекер</string>
+    <string name="menu_tracks">Треки</string>
     <string name="no_sensor">Датчик не найден</string>
     <string name="no_sensor_explain">Данному приложению требуется аппаратный датчик шагов, которого нет в вашем устройстве. Это приложение не будет работать на вашем устройстве.</string>
     <string name="steps">шагов</string>

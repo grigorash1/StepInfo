@@ -29,6 +29,7 @@ import ru.grigorash.stepinfo.service.SensorListenerSvc;
 import ru.grigorash.stepinfo.ui.settings.SettingsFragment;
 import ru.grigorash.stepinfo.ui.statistics.StatisticsFragment;
 import ru.grigorash.stepinfo.ui.tracker.TrackerFragment;
+import ru.grigorash.stepinfo.ui.tracksviewer.TracksViewFragment;
 
 public class MainActivity extends AppCompatActivity
 {
@@ -52,15 +53,7 @@ public class MainActivity extends AppCompatActivity
         setSupportActionBar(m_toolbar);
         m_nv = findViewById(R.id.navigation);
         initializeFragments();
-        m_nv.setOnNavigationItemSelectedListener(
-                new BottomNavigationView.OnNavigationItemSelectedListener()
-                {
-                    @Override
-                    public boolean onNavigationItemSelected(@NonNull MenuItem item)
-                    {
-                        return MainActivity.this.onNavigationItemSelected(item);
-                    }
-                });
+        m_nv.setOnNavigationItemSelectedListener(item -> MainActivity.this.onNavigationItemSelected(item));
     }
 
     private boolean onNavigationItemSelected(@NonNull MenuItem item)
@@ -140,6 +133,7 @@ public class MainActivity extends AppCompatActivity
         m_fragments.put(R.id.nav_statistics, new StatisticsFragment());
         m_fragments.put(R.id.nav_tracker, new TrackerFragment());
         m_fragments.put(R.id.nav_settings, new SettingsFragment());
+        m_fragments.put(R.id.nav_tracks, new TracksViewFragment());
         // navigate to the current selected
         onNavigationItemSelected(m_nv.getMenu().findItem(m_nv.getSelectedItemId()));
     }

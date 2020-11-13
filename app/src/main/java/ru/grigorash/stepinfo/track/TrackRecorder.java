@@ -25,6 +25,7 @@ import java.io.FileOutputStream;
 
 import ru.grigorash.stepinfo.R;
 import ru.grigorash.stepinfo.utils.CommonUtils;
+import static ru.grigorash.stepinfo.utils.CommonUtils.distance;
 
 public class TrackRecorder implements LocationListener
 {
@@ -65,7 +66,7 @@ public class TrackRecorder implements LocationListener
             // for ActivityCompat#requestPermissions for more details.
             return;
         }
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 10, this);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 3, this);
     }
 
     @Override
@@ -207,10 +208,10 @@ public class TrackRecorder implements LocationListener
     private void sendNewPositionEvent(Location location)
     {
         Intent intent = new Intent(ACTION_ON_NEW_POSITION);
-        intent.putExtra("Lat", location.getLatitude());
-        intent.putExtra("Lon", location.getLongitude());
-        intent.putExtra("Speed", location.getSpeed());
-        intent.putExtra("Alt", location.getAltitude());
+        intent.putExtra("lat", location.getLatitude());
+        intent.putExtra("lon", location.getLongitude());
+        intent.putExtra("speed", location.getSpeed());
+        intent.putExtra("alt", location.getAltitude());
         m_svc_context.sendBroadcast(intent);
     }
 
@@ -222,49 +223,54 @@ public class TrackRecorder implements LocationListener
         m_svc_context.sendBroadcast(intent);
     }
 
+    private void sendBadSignalEvent(Location location)
+    {
+        Intent intent = new Intent(ACTION_ON_BAD_POSITION);
+        intent.putExtra("lat", location.getLatitude());
+        intent.putExtra("lon", location.getLongitude());
+        intent.putExtra("speed", location.getSpeed());
+        intent.putExtra("accuracy", location.getAccuracy());
+        m_svc_context.sendBroadcast(intent);
+    }
+
     private void writeFooter()
     {
 
     }
 
-    private boolean isStop(Location location)
+    // check that user has walked less than 10 meters in 15 seconds
+    private void checkStop(Location location)
     {
-        if (location.getSpeed() < 1.0)
+        if (m_last_location == null)
+            return;
+        long last_loc_time = m_last_location.getTime();
+        double dist = distance(m_last_location.getLatitude(), location.getLatitude(), m_last_location.getLongitude(), location.getLongitude());
+        if((dist <= MINIMUM_DISTANCE * 2) && ((location.getTime() - last_loc_time) > 15000))
         {
-            if (m_last_stop_time == 0)
-                m_last_stop_time = location.getTime();
-            else
-            {
-                long stop_time = location.getTime() - m_last_stop_time;
-                if ((stop_time > 10 * 1000) && !m_stop_signal_sended)
-                {
-                    writeStop(location);
-                    m_stop_signal_sended = true;
-                }
-            }
-            return true;
+            Location loc = new Location(location);
+            loc.setTime(m_last_location.getTime());
+            writeStop(location);
         }
-        return false;
     }
+
     private boolean filter(Location location)
     {
         if (!m_recording)
             return false;
-        /*
-        if (location.getAccuracy() > (MINIMUM_DISTANCE * 2))
+
+        if (location.getAccuracy() > (MINIMUM_DISTANCE * 3))
         {
-            m_svc_context.sendBroadcast(new Intent(ACTION_ON_BAD_POSITION));
+            sendBadSignalEvent(location);
             return false;
         }
-        */
+
         if (m_last_location == null)
         {
             m_last_location = location;
             return true;
         }
 
-        if (isStop(location))
-            return false;
+        checkStop(location);
 
         double distance = CommonUtils.distance(m_last_location.getLatitude(), location.getLatitude(), m_last_location.getLongitude(), location.getLongitude());
         if (distance > MINIMUM_DISTANCE)

@@ -16,6 +16,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -50,14 +51,16 @@ public class TrackerFragment extends Fragment
 {
     private final static int REQUEST_PERMISSIONS_REQUEST_CODE = 1;
 
-    private MapView m_map;
-    private SettingsViewModel m_settings;
+    private MapView              m_map;
+    private SettingsViewModel    m_settings;
     private MyLocationNewOverlay m_myLocationOverlay;
     private FloatingActionButton m_btnRecordTrack;
-    private ServiceConnection m_connection;
-    private SensorListenerSvc m_service;
-    private BroadcastReceiver m_broadcastReceiver;
-    private TrackRenderer m_current_track_renderer;
+    private FloatingActionButton m_btnGotoMyPosition;
+    private ServiceConnection    m_connection;
+    private SensorListenerSvc    m_service;
+    private BroadcastReceiver    m_broadcastReceiver;
+    private TrackRenderer        m_current_track_renderer;
+    private TextView             m_text_info;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState)
@@ -70,13 +73,19 @@ public class TrackerFragment extends Fragment
         m_map = root.findViewById(R.id.map);
         m_map.setTileSource(TileSourceFactory.DEFAULT_TILE_SOURCE);
         m_map.setMultiTouchControls(true);
+        m_map.setFlingEnabled(true);
         //Add my location overlay
         m_myLocationOverlay = new MyLocationNewOverlay(new GpsMyLocationProvider(getActivity()), m_map);
         m_myLocationOverlay.enableMyLocation();
+
         m_map.getOverlays().add(m_myLocationOverlay);
         m_map.getZoomController().setVisibility(CustomZoomButtonsController.Visibility.NEVER);
         m_btnRecordTrack = root.findViewById(R.id.btnRecordTrack);
         m_btnRecordTrack.setOnClickListener(v -> onRecordTrackClick());
+        m_btnGotoMyPosition = root.findViewById(R.id.btnGotoMyLocation);
+        m_btnGotoMyPosition.setOnClickListener(v -> onGotoMyPositionClick());
+        m_text_info = root.findViewById(R.id.txtInfo);
+
         requestPermissionsIfNecessary(new String[]{
                 // current location
                 Manifest.permission.ACCESS_FINE_LOCATION,
@@ -195,26 +204,30 @@ public class TrackerFragment extends Fragment
             {
                 if (TrackRecorder.ACTION_RECORDING_STATUS_CHANGED.equals(intent.getAction()))
                 {
+                    m_text_info.setText("");
                     setRecordingTrackButtonImage();
                     initMyTrackRenderer();
                 }
                 else if (TrackRecorder.ACTION_ON_NEW_POSITION.equals(intent.getAction()))
                 {
+                    double speed = intent.getFloatExtra("speed", -100.0f);
+                    m_text_info.setText(String.format("speed: %.2f", speed * 3.6));
                     Animation anim = android.view.animation.AnimationUtils.loadAnimation(m_btnRecordTrack.getContext(),  R.anim.shake);
                     m_btnRecordTrack.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_stop_record));
                     m_btnRecordTrack.startAnimation(anim);
                 }
                 else if (TrackRecorder.ACTION_ON_STOP.equals(intent.getAction()))
                 {
-                    GeoPoint startPoint = new GeoPoint( intent.getDoubleExtra("lat", 0), intent.getDoubleExtra("lon", 0));
-                    Marker stopMarker = new Marker(m_map);
-                    stopMarker.setPosition(startPoint);
-                    stopMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-                    stopMarker.setIcon(ContextCompat.getDrawable(getActivity(), R.drawable.ic_stop));
-                    m_map.getOverlays().add(stopMarker);
+                    GeoPoint startPoint = new GeoPoint(intent.getDoubleExtra("lat", 0), intent.getDoubleExtra("lon", 0));
+                    TrackRenderer.addStopMarker(getActivity(), m_map, startPoint);
                 }
                 else if (TrackRecorder.ACTION_ON_BAD_POSITION.equals(intent.getAction()))
+                {
+                    float speed = intent.getFloatExtra("speed", -100.0f);
+                    float accuracy = intent.getFloatExtra("accuracy", -100.0f);
+                    m_text_info.setText(String.format("speed: %.2f acc: %.2f ", speed  * 3.6, accuracy));
                     m_btnRecordTrack.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_no_network));
+                }
             }
         };
         IntentFilter filter = new IntentFilter(TrackRecorder.ACTION_RECORDING_STATUS_CHANGED);
@@ -222,6 +235,21 @@ public class TrackerFragment extends Fragment
         filter.addAction(TrackRecorder.ACTION_ON_BAD_POSITION);
         filter.addAction(TrackRecorder.ACTION_ON_STOP);
         getActivity().registerReceiver(m_broadcastReceiver, filter);
+    }
+
+    private void onGotoMyPositionClick()
+    {
+        GeoPoint my_position = m_myLocationOverlay.getMyLocation();
+        if (my_position == null)
+        {
+            Animation anim = android.view.animation.AnimationUtils.loadAnimation(m_btnGotoMyPosition.getContext(),  R.anim.shake);
+            m_btnGotoMyPosition.startAnimation(anim);
+            return;
+        }
+        double current_zoom = m_map.getZoomLevelDouble();
+        if (current_zoom < 17.0)
+            current_zoom = 17.0;
+        m_map.getController().animateTo(my_position, current_zoom, 1000L);
     }
 
     private void onRecordTrackClick()

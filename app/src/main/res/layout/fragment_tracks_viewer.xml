@@ -5,7 +5,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/btnRecordTrack"
+        android:id="@+id/btnSelectTrack"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:clickable="true"
@@ -13,22 +13,6 @@
         app:srcCompat="@drawable/ic_start_record"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="10dp"
-        app:rippleColor="@null"
-        app:backgroundTint="@null"
-        app:fabSize="mini"
-        />
-
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/btnGotoMyLocation"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:clickable="true"
-        android:focusable="true"
-        app:srcCompat="@drawable/ic_my_location"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btnRecordTrack"
         android:layout_marginStart="10dp"
         android:layout_marginTop="10dp"
         app:rippleColor="@null"

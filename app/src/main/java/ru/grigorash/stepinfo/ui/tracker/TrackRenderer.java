@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.location.Location;
 import android.location.LocationManager;
 
 import androidx.core.content.ContextCompat;
@@ -14,6 +15,7 @@ import com.balsikandar.crashreporter.CrashReporter;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
+import org.osmdroid.views.overlay.Overlay;
 import org.osmdroid.views.overlay.Polyline;
 
 import java.io.DataInputStream;
@@ -39,7 +41,7 @@ public class TrackRenderer
     private final Polyline m_current_track;
     private final String   m_event_type;
     private BroadcastReceiver m_broadcastReceiver;
-    private final Activity m_parent;
+    private final Activity    m_parent;
 
     public TrackRenderer(Activity parent, MapView map, String event_type, File initial_file, int color)
     {
@@ -66,8 +68,8 @@ public class TrackRenderer
             {
                 if (m_event_type.equals(intent.getAction()))
                 {
-                    double lat = intent.getDoubleExtra("Lat", 0.0);
-                    double lon = intent.getDoubleExtra("Lon", 0.0);
+                    double lat = intent.getDoubleExtra("lat", 0.0);
+                    double lon = intent.getDoubleExtra("lon", 0.0);
                     if ((lat != 0.0) && (lon != 0.0))
                     {
                         m_current_track.addPoint(new GeoPoint(lat, lon));
@@ -84,6 +86,19 @@ public class TrackRenderer
     public void removeTrack()
     {
         m_map.getOverlays().remove(m_current_track);
+        for (int i = 0; i < m_map.getOverlays().size(); i++)
+        {
+            Overlay o = m_map.getOverlays().get(i);
+            if (o instanceof Marker)
+            {
+                Marker m = (Marker)o;
+                if (m.getId().startsWith("stop_sign_"))
+                {
+                    m_map.getOverlays().remove(i);
+                    i--;
+                }
+            }
+        }
         m_map.invalidate();
     }
 
@@ -103,11 +118,7 @@ public class TrackRenderer
                     case TrackRecorder.RECORD_STOP:
                         RecordStop stop = (RecordStop)record;
                         GeoPoint startPoint = new GeoPoint(stop.lat, stop.lon);
-                        Marker stopMarker = new Marker(m_map);
-                        stopMarker.setPosition(startPoint);
-                        stopMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-                        stopMarker.setIcon(ContextCompat.getDrawable(m_parent, R.drawable.ic_stop));
-                        m_map.getOverlays().add(stopMarker);
+                        addStopMarker(m_parent, m_map, startPoint);
                         break;
                 }
             }
@@ -116,41 +127,16 @@ public class TrackRenderer
         {
             CrashReporter.logException(e);
         }
-/*
-        try (FileInputStream fs = new FileInputStream(initial_file))
-        {
-            DataInputStream ds = new DataInputStream(fs);
-            byte[] signature = new byte[4];
-            ds.read(signature, 0, signature.length);
-            if (!Arrays.equals(signature, TrackRecorder.FILE_SIGNATURE))
-                throw new Exception("invalid file");
-            byte version = ds.readByte();
-            if (version != TrackRecorder.FORMAT_VERSION)
-                throw new Exception("invalid file");
-            while (ds.available() > 0)
-            {
-                byte record_type = ds.readByte();
-                switch (record_type)
-                {
-                    case TrackRecorder.RECORD_POSITION:
-                        {
-                            double alt = ds.readDouble();
-                            float speed = ds.readFloat();
-                            double lat = ds.readDouble();
-                            double lon = ds.readDouble();
-                            long time = ds.readLong();
-                            m_current_track.addPoint(new GeoPoint(lat, lon));
-                        }
-                        break;
-                    default:
-                        throw new Exception("invalid file");
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            CrashReporter.logException(e);
-        }
- */
+    }
+
+    public static void addStopMarker(Context ctx, MapView map, GeoPoint point)
+    {
+        Marker stopMarker = new Marker(map);
+        stopMarker.setPosition(point);
+
+        stopMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
+        stopMarker.setIcon(ContextCompat.getDrawable(ctx, R.drawable.ic_stop));
+        stopMarker.setId(String.format("stop_sign_%d", map.getOverlays().size()));
+        map.getOverlays().add(stopMarker);
     }
 }

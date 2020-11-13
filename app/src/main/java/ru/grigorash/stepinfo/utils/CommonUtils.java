@@ -20,6 +20,8 @@ import java.lang.reflect.Field;
 import java.util.Calendar;
 import java.util.Map;
 
+import ru.grigorash.stepinfo.track.ITrackReader;
+
 public final class CommonUtils
 {
     // Get Current Day in Milliseconds
