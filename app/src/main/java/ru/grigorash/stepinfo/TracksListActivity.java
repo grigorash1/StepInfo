@@ -2,6 +2,8 @@ package ru.grigorash.stepinfo;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -9,6 +11,7 @@ import android.widget.ListView;
 
 import ru.grigorash.stepinfo.adapter.SettingsAdapter;
 import ru.grigorash.stepinfo.adapter.TracksAdapter;
+import ru.grigorash.stepinfo.track.TrackInfo;
 import ru.grigorash.stepinfo.track.TrackRecorder;
 
 public class TracksListActivity extends AppCompatActivity
@@ -33,7 +36,10 @@ public class TracksListActivity extends AppCompatActivity
             m_lv_tracks.setAdapter(m_adapter);
             m_lv_tracks.setOnItemClickListener((parent, view, position, id) ->
             {
-
+                Intent returnIntent = new Intent();
+                returnIntent.putExtra("result", ((TrackInfo)m_adapter.getItem(position)).fileUri());
+                setResult(Activity.RESULT_OK, returnIntent);
+                finish();
             });
         }
     }

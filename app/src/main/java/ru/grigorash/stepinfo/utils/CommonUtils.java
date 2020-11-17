@@ -1,14 +1,29 @@
 package ru.grigorash.stepinfo.utils;
 
+import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.location.LocationManager;
 import android.os.Build;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
+
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+
+import org.osmdroid.api.IGeoPoint;
+import org.osmdroid.api.IMapController;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,6 +36,7 @@ import java.util.Calendar;
 import java.util.Map;
 
 import ru.grigorash.stepinfo.track.ITrackReader;
+import ru.grigorash.stepinfo.ui.settings.SettingsViewModel;
 
 public final class CommonUtils
 {
@@ -90,6 +106,35 @@ public final class CommonUtils
         }
     }
 
+    public static void setMapCenter(final Activity parent, final MapView map, final SettingsViewModel settings)
+    {
+        IGeoPoint center = settings.getMapCenter();
+        float scale = settings.getMapScale();
+        if (center != null)
+        {
+            IMapController controller = map.getController();
+            controller.setCenter(center);
+            controller.setZoom(scale);
+        }
+        else
+        {
+            FusedLocationProviderClient fusedLocationClient = LocationServices.getFusedLocationProviderClient(parent);
+            if (ActivityCompat.checkSelfPermission(parent, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                    ActivityCompat.checkSelfPermission(parent, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                return;
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(parent, location ->
+                    {
+                        // Got last known location. In some rare situations this can be null.
+                        if (location != null)
+                        {
+                            IMapController controller = map.getController();
+                            controller.animateTo(new GeoPoint(location.getLatitude(), location.getLongitude()), (double)scale, (long)1000);
+                        }
+                    });
+        }
+    }
+
     public static Activity getActivity()
     {
         try
@@ -122,5 +167,20 @@ public final class CommonUtils
             return null;
         }
         return null;
+    }
+
+    public static Drawable getBitmapFromVectorDrawable(Context context, int drawableId, int width, int height)
+    {
+        Drawable drawable = ContextCompat.getDrawable(context, drawableId);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            drawable = (DrawableCompat.wrap(drawable)).mutate();
+        }
+
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        drawable.setBounds(0, 0, width - 1, height - 1);
+        drawable.draw(canvas);
+        return new BitmapDrawable(context.getResources(), bitmap);
+        //return bitmap;
     }
 }

@@ -46,6 +46,7 @@ import ru.grigorash.stepinfo.track.TrackRecorder;
 import ru.grigorash.stepinfo.ui.settings.SettingsViewModel;
 
 import static android.content.Context.BIND_AUTO_CREATE;
+import static ru.grigorash.stepinfo.utils.CommonUtils.setMapCenter;
 
 public class TrackerFragment extends Fragment
 {
@@ -122,31 +123,7 @@ public class TrackerFragment extends Fragment
     public void onResume()
     {
         super.onResume();
-        IGeoPoint center = m_settings.getMapCenter();
-        float scale = m_settings.getMapScale();
-        if (center != null)
-        {
-            IMapController controller = m_map.getController();
-            controller.setCenter(center);
-            controller.setZoom(scale);
-        }
-        else
-        {
-            FusedLocationProviderClient fusedLocationClient = LocationServices.getFusedLocationProviderClient(getActivity());
-            if (ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-                return;
-            fusedLocationClient.getLastLocation()
-                    .addOnSuccessListener(getActivity(), location ->
-                    {
-                        // Got last known location. In some rare situations this can be null.
-                        if (location != null)
-                        {
-                            IMapController controller = m_map.getController();
-                            controller.animateTo(new GeoPoint(location.getLatitude(), location.getLongitude()), (double)scale, (long)1000);
-                        }
-                    });
-        }
+        setMapCenter(getActivity(), m_map, m_settings);
         m_map.onResume(); //needed for compass, my location overlays, v6.0.0 and up
         initServiceConnection();
         initBroadcastReceiver();

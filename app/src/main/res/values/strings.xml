@@ -29,5 +29,6 @@
     <string name="save_track_message">Would you like to save the track?</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
-
+    <string name="track_length">Len %.2f km</string>
+    <string name="avg_track_speed">Avg speed %.2f km/h</string>
 </resources>

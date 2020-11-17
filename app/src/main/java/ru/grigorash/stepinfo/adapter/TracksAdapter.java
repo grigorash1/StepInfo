@@ -67,9 +67,9 @@ public class TracksAdapter extends BaseAdapter
             m_parent.runOnUiThread(() ->
             {
                 if (m_tv_length != null)
-                    m_tv_length.setText(df2.format(complete_info.length()) + " km");
+                    m_tv_length.setText(m_parent.getString(R.string.track_length, complete_info.length()));
                 if (m_tv_avg_speed != null)
-                    m_tv_avg_speed.setText(df2.format(complete_info.avgSpeed()) + " km/h");
+                    m_tv_avg_speed.setText(m_parent.getString(R.string.avg_track_speed, complete_info.avgSpeed()));
             });
         }
     }

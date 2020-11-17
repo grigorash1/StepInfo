@@ -29,4 +29,6 @@
     <string name="save_track_message">Хотите сохранить это трек?</string>
     <string name="yes">Да</string>
     <string name="no">Нет</string>
+    <string name="track_length">Расст. %.2f км</string>
+    <string name="avg_track_speed">Ср. скорость %.2f км\ч</string>
 </resources>

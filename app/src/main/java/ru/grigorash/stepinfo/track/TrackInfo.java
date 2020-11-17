@@ -14,23 +14,24 @@ import static ru.grigorash.stepinfo.track.TrackReaderFactory.getReader;
 
 public class TrackInfo
 {
-    private final String m_track_name;
+    private final String m_track_file;
 
     private Double m_total_length;
     private Double m_avg_speed;
 
     public TrackInfo(String file_uri)
     {
-        m_track_name = file_uri;
+        m_track_file = file_uri;
     }
 
     public String name()
     {
-        int pos = m_track_name.lastIndexOf("/");
-        return m_track_name.substring(pos + 1, m_track_name.length() - 4);
+        int pos = m_track_file.lastIndexOf("/");
+        return m_track_file.substring(pos + 1, m_track_file.length() - 4);
     }
     public Double length()   { return m_total_length; }
     public Double avgSpeed() { return m_avg_speed; }
+    public String fileUri() { return m_track_file; }
 
     public void asyncGetInfo(final Consumer<TrackInfo> on_complete)
     {
@@ -42,7 +43,7 @@ public class TrackInfo
 
     private void evalTrackParams(final Consumer<TrackInfo> on_complete)
     {
-        try (ITrackReader reader = getReader(new File(m_track_name)))
+        try (ITrackReader reader = getReader(new File(m_track_file)))
         {
             int counter = 0;
             m_avg_speed = 0.0;

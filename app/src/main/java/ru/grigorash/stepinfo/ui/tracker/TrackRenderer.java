@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat;
 
 import com.balsikandar.crashreporter.CrashReporter;
 
+import org.apache.commons.lang3.StringUtils;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
@@ -37,9 +38,9 @@ import ru.grigorash.stepinfo.utils.CommonUtils;
 
 public class TrackRenderer
 {
-    private final MapView  m_map;
-    private final Polyline m_current_track;
-    private final String   m_event_type;
+    private final MapView     m_map;
+    private final Polyline    m_current_track;
+    private final String      m_event_type;
     private BroadcastReceiver m_broadcastReceiver;
     private final Activity    m_parent;
 
@@ -54,7 +55,8 @@ public class TrackRenderer
         m_current_track.getOutlinePaint().setColor(color);
 
         initFromFile(initial_file);
-        initBroadcastReceiver();
+        if (!StringUtils.isEmpty(m_event_type))
+            initBroadcastReceiver();
         m_map.getOverlays().add(m_current_track);
         m_map.invalidate();
     }
@@ -82,6 +84,8 @@ public class TrackRenderer
         IntentFilter filter = new IntentFilter(m_event_type);
         m_parent.registerReceiver(m_broadcastReceiver, filter);
     }
+
+    public Polyline polyline() {return  m_current_track; }
 
     public void removeTrack()
     {
