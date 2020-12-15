@@ -18,6 +18,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Binder;
 import android.speech.tts.TextToSpeech;
+import android.text.TextUtils;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
 
@@ -29,8 +30,10 @@ import java.util.Locale;
 import ru.grigorash.stepinfo.MainActivity;
 import ru.grigorash.stepinfo.R;
 import ru.grigorash.stepinfo.dao.StatisticDatabase;
+import ru.grigorash.stepinfo.track.RivalWatcher;
 import ru.grigorash.stepinfo.track.TrackRecorder;
 import ru.grigorash.stepinfo.ui.settings.SettingsViewModel;
+import ru.grigorash.stepinfo.ui.tracker.TrackerFragment;
 import ru.grigorash.stepinfo.utils.API26Wrapper;
 import ru.grigorash.stepinfo.utils.CommonUtils;
 
@@ -61,6 +64,7 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
     private BroadcastReceiver m_broadcastReceiver;
     private TrackRecorder m_track_recorder;
     private IBinder m_binder;
+    private RivalWatcher m_rival_watcher;
 
     public class LocalBinder extends Binder
     {
@@ -154,6 +158,19 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
         return START_STICKY;
     }
 
+    public void setRivalTrack(String track_file)
+    {
+        if (m_rival_watcher != null)
+            m_rival_watcher.Stop();
+        if (!TextUtils.isEmpty(track_file))
+        {
+            m_rival_watcher = new RivalWatcher(this);
+            m_rival_watcher.setTrack(track_file);
+        }
+        else
+            m_rival_watcher = null;
+    }
+
     private void initBroadcastReceiver()
     {
         m_broadcastReceiver = new BroadcastReceiver()
@@ -177,6 +194,8 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
                     if (m_track_recorder == null)
                         m_track_recorder = new TrackRecorder(SensorListenerSvc.this);
                     m_track_recorder.Start();
+                    if (m_rival_watcher != null)
+                        m_rival_watcher.Start();
                 }
                 else if (ACTION_TRACK_PAUSE_REC.equals(intent.getAction()))
                 {
@@ -190,6 +209,13 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
                         m_track_recorder.Stop();
                         m_track_recorder = null;
                     }
+                    if (m_rival_watcher != null)
+                        m_rival_watcher.Stop();
+                }
+                else if (TrackerFragment.ACTION_ON_SELECT_RIVAL_TRACK.equals(intent.getAction()))
+                {
+                    String track_file = intent.getStringExtra("track_file");
+                    setRivalTrack(track_file);
                 }
             }
         };
@@ -199,7 +225,13 @@ public class SensorListenerSvc extends Service implements StepCounterEventListen
         filter.addAction(ACTION_TRACK_START_REC);
         filter.addAction(ACTION_TRACK_PAUSE_REC);
         filter.addAction(ACTION_TRACK_STOP_REC);
+        filter.addAction(TrackerFragment.ACTION_ON_SELECT_RIVAL_TRACK);
         registerReceiver(m_broadcastReceiver, filter);
+    }
+
+    public RivalWatcher getRivalWatcher()
+    {
+        return m_rival_watcher;
     }
 
     private void initTextToSpeech()

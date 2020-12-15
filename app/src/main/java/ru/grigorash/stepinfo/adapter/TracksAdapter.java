@@ -3,6 +3,7 @@ package ru.grigorash.stepinfo.adapter;
 import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,6 +28,14 @@ import ru.grigorash.stepinfo.track.TrackInfo;
 public class TracksAdapter extends BaseAdapter
 {
     private static DecimalFormat df2 = new DecimalFormat("#.##");
+
+    public void deleteTrack(int index)
+    {
+        TrackInfo track_info = m_tracks.get(index);
+        File track_file = new File(track_info.fileUri());
+        track_file.delete();
+        m_tracks.remove(index);
+    }
 
     private class TrackViewHolder
     {
@@ -72,15 +81,27 @@ public class TracksAdapter extends BaseAdapter
                     m_tv_avg_speed.setText(m_parent.getString(R.string.avg_track_speed, complete_info.avgSpeed()));
             });
         }
+
+        public void setSelected(boolean selected)
+        {
+            m_tv_name.setTypeface(null, selected ? Typeface.BOLD : Typeface.NORMAL);
+            m_tv_name.invalidate();
+            m_tv_length.setTypeface(null, selected ? Typeface.BOLD : Typeface.NORMAL);
+            m_tv_length.invalidate();
+            m_tv_avg_speed.setTypeface(null, selected ? Typeface.BOLD : Typeface.NORMAL);
+            m_tv_avg_speed.invalidate();
+        }
     }
 
-    private Activity m_parent;
+    private Activity        m_parent;
     private List<TrackInfo> m_tracks;
+    private int             m_selected_position;
 
     public TracksAdapter(@NotNull Activity parent, @NotNull File base_dir)
     {
         try
         {
+            m_selected_position = -1;
             m_parent = parent;
             m_tracks = new ArrayList<>();
             String[] track_files = base_dir.list((dir, name) -> name.endsWith(".bin"));
@@ -92,6 +113,14 @@ public class TracksAdapter extends BaseAdapter
             CrashReporter.logException(e);
         }
     }
+
+    public void setSelected(int position)
+    {
+        m_selected_position = position;
+        notifyDataSetChanged();
+    }
+
+    public int getSelected() {return m_selected_position; }
 
     @Override
     public int getCount() { return m_tracks.size(); }
@@ -115,7 +144,8 @@ public class TracksAdapter extends BaseAdapter
         else
             viewHolder = (TrackViewHolder)convertView.getTag();
         viewHolder.setTrack(m_tracks.get(position));
+        viewHolder.setSelected(m_selected_position == position);
         return convertView;
-
     }
+
 }

@@ -1,9 +1,12 @@
 package ru.grigorash.stepinfo.ui.tracker;
 
 import android.Manifest;
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
@@ -15,6 +18,7 @@ import android.preference.PreferenceManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.animation.Animation;
 import android.widget.TextView;
 
@@ -35,13 +39,18 @@ import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.CustomZoomButtonsController;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
+import org.osmdroid.views.overlay.Overlay;
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider;
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import ru.grigorash.stepinfo.R;
+import ru.grigorash.stepinfo.TracksListActivity;
 import ru.grigorash.stepinfo.service.SensorListenerSvc;
+import ru.grigorash.stepinfo.track.RecordPosition;
+import ru.grigorash.stepinfo.track.RivalWatcher;
 import ru.grigorash.stepinfo.track.TrackRecorder;
 import ru.grigorash.stepinfo.ui.settings.SettingsViewModel;
 
@@ -50,17 +59,22 @@ import static ru.grigorash.stepinfo.utils.CommonUtils.setMapCenter;
 
 public class TrackerFragment extends Fragment
 {
-    private final static int REQUEST_PERMISSIONS_REQUEST_CODE = 1;
+    public final static String ACTION_ON_SELECT_RIVAL_TRACK = "ru.StepInfo.ACTION_ON_SELECT_RIVAL_TRACK";
 
+    private final static int REQUEST_PERMISSIONS_REQUEST_CODE = 1;
+    private final static int SELECT_TRACK_REQUEST_CODE = 223;
+    private final static String RIVAL_MARKER_ID = "RIVAL_MARKER";
     private MapView              m_map;
     private SettingsViewModel    m_settings;
     private MyLocationNewOverlay m_myLocationOverlay;
     private FloatingActionButton m_btnRecordTrack;
     private FloatingActionButton m_btnGotoMyPosition;
+    private FloatingActionButton m_btnSelectRival;
     private ServiceConnection    m_connection;
     private SensorListenerSvc    m_service;
     private BroadcastReceiver    m_broadcastReceiver;
     private TrackRenderer        m_current_track_renderer;
+    private TrackRenderer        m_rival_track_renderer;
     private TextView             m_text_info;
 
     @Override
@@ -85,6 +99,9 @@ public class TrackerFragment extends Fragment
         m_btnRecordTrack.setOnClickListener(v -> onRecordTrackClick());
         m_btnGotoMyPosition = root.findViewById(R.id.btnGotoMyLocation);
         m_btnGotoMyPosition.setOnClickListener(v -> onGotoMyPositionClick());
+        m_btnSelectRival = root.findViewById(R.id.btnSelectRival);
+        m_btnSelectRival.setOnClickListener(v -> onSelectRivalClick());
+        m_btnSelectRival.setOnLongClickListener(v -> onLongRivalClick());
         m_text_info = root.findViewById(R.id.txtInfo);
 
         requestPermissionsIfNecessary(new String[]{
@@ -196,7 +213,7 @@ public class TrackerFragment extends Fragment
                 else if (TrackRecorder.ACTION_ON_STOP.equals(intent.getAction()))
                 {
                     GeoPoint startPoint = new GeoPoint(intent.getDoubleExtra("lat", 0), intent.getDoubleExtra("lon", 0));
-                    TrackRenderer.addStopMarker(getActivity(), m_map, startPoint);
+                    TrackRenderer.addStopMarker(getActivity(), m_map, startPoint, 0);
                 }
                 else if (TrackRecorder.ACTION_ON_BAD_POSITION.equals(intent.getAction()))
                 {
@@ -205,13 +222,56 @@ public class TrackerFragment extends Fragment
                     m_text_info.setText(String.format("speed: %.2f acc: %.2f ", speed  * 3.6, accuracy));
                     m_btnRecordTrack.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_no_network));
                 }
+                else if (RivalWatcher.ACTION_RIVAL_MOVE.equals(intent.getAction()))
+                {
+                    Marker rival = null;
+                    for (Overlay o : m_map.getOverlays())
+                    {
+                        if (o instanceof Marker)
+                        {
+                            Marker m = (Marker)o;
+                            if (m.getId().equals(RIVAL_MARKER_ID))
+                            {
+                                rival = m;
+                                break;
+                            }
+                        }
+                    }
+                    if (rival == null)
+                    {
+                        rival = new Marker(m_map);
+                        rival.setIcon(ContextCompat.getDrawable(getActivity(), R.drawable.ic_rival));
+                        rival.setId(RIVAL_MARKER_ID);
+                        m_map.getOverlays().add(rival);
+                    }
+                    rival.setPosition(new GeoPoint(intent.getDoubleExtra("lat", 0), intent.getDoubleExtra("lon", 0)));
+                    rival.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
+                    m_map.invalidate();
+                }
             }
         };
         IntentFilter filter = new IntentFilter(TrackRecorder.ACTION_RECORDING_STATUS_CHANGED);
         filter.addAction(TrackRecorder.ACTION_ON_NEW_POSITION);
         filter.addAction(TrackRecorder.ACTION_ON_BAD_POSITION);
         filter.addAction(TrackRecorder.ACTION_ON_STOP);
+        filter.addAction(RivalWatcher.ACTION_RIVAL_MOVE);
         getActivity().registerReceiver(m_broadcastReceiver, filter);
+    }
+
+    private void removeRivalMarker()
+    {
+        for (Overlay o : m_map.getOverlays())
+        {
+            if (o instanceof Marker)
+            {
+                Marker m = (Marker)o;
+                if (m.getId().equals(RIVAL_MARKER_ID))
+                {
+                    m.remove(m_map);
+                    break;
+                }
+            }
+        }
     }
 
     private void onGotoMyPositionClick()
@@ -239,6 +299,69 @@ public class TrackerFragment extends Fragment
         m_btnRecordTrack.startAnimation(anim);
     }
 
+    private boolean onLongRivalClick()
+    {
+        if ((m_service == null) || (m_rival_track_renderer == null))
+            return false;
+        AlertDialog alert = new AlertDialog.Builder(getActivity()).setTitle(R.string.remove_rival_track_caption)
+                .setMessage(R.string.remove_rival_track_message)
+                .setPositiveButton(android.R.string.ok, (dialog, which) ->
+                {
+                    Intent intent = new Intent(ACTION_ON_SELECT_RIVAL_TRACK);
+                    intent.putExtra("track_file", (String)null);
+                    getActivity().sendBroadcast(intent);
+                    dialog.dismiss();
+                    if (m_rival_track_renderer != null)
+                        m_rival_track_renderer.removeTrack();
+                    removeRivalMarker();
+                })
+                .setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss())
+                .create();
+        alert.show();
+        return true;
+    }
+
+    private void onSelectRivalClick()
+    {
+        if (m_service == null)
+            return;
+        Animation anim = android.view.animation.AnimationUtils.loadAnimation(m_btnSelectRival.getContext(), R.anim.pulse);
+        m_btnSelectRival.startAnimation(anim);
+        Intent intent = new Intent(getActivity(), TracksListActivity.class);
+        startActivityForResult(intent, SELECT_TRACK_REQUEST_CODE);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data)
+    {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == SELECT_TRACK_REQUEST_CODE && resultCode == Activity.RESULT_OK)
+        {
+            Intent intent = new Intent(ACTION_ON_SELECT_RIVAL_TRACK);
+            intent.putExtra("track_file", data.getStringExtra("result"));
+            getActivity().sendBroadcast(intent);
+        }
+        else if (requestCode == SELECT_TRACK_REQUEST_CODE && resultCode == Activity.RESULT_CANCELED)
+        {
+            Intent intent = new Intent(ACTION_ON_SELECT_RIVAL_TRACK);
+            intent.putExtra("track_file", (String)null);
+            getActivity().sendBroadcast(intent);
+            removeRivalMarker();
+        }
+    }
+
+    private void initRivalTrack()
+    {
+        if (m_rival_track_renderer != null)
+            m_rival_track_renderer.removeTrack();
+
+        RivalWatcher rival_watcher = m_service.getRivalWatcher();
+        if (rival_watcher == null)
+            return;
+        List<RecordPosition> rival_track = rival_watcher.getTrackData();
+        m_rival_track_renderer = new TrackRenderer(getActivity(), m_map, rival_track, Color.GRAY);
+    }
+
     private void setRecordingTrackButtonImage()
     {
         if (!isAdded())
@@ -257,5 +380,6 @@ public class TrackerFragment extends Fragment
             m_current_track_renderer.removeTrack();
         if (m_service.isRecordingTrack())
             m_current_track_renderer = new TrackRenderer(getActivity(), m_map, TrackRecorder.ACTION_ON_NEW_POSITION, TrackRecorder.getCurrentTrackFile(getActivity()), Color.GREEN);
+        initRivalTrack();
     }
 }

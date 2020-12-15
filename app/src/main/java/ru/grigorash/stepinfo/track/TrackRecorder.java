@@ -22,6 +22,7 @@ import com.balsikandar.crashreporter.CrashReporter;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.Date;
 
 import ru.grigorash.stepinfo.R;
 import ru.grigorash.stepinfo.utils.CommonUtils;
@@ -48,8 +49,6 @@ public class TrackRecorder implements LocationListener
     private boolean  m_recording;
     private Location m_last_location;
     private double   m_total_distance;
-    private long m_last_stop_time;
-    private boolean m_stop_signal_sended;
 
     public TrackRecorder(Context context)
     {
@@ -238,18 +237,43 @@ public class TrackRecorder implements LocationListener
 
     }
 
+    private void writeLog(String info)
+    {
+        try
+        {
+            File log_dir = m_svc_context.getExternalFilesDir(Environment.getDataDirectory().getAbsolutePath());
+            File log = new File(log_dir, "log.txt");
+            if (!log.exists())
+            {
+                log.createNewFile();
+                log.setWritable(true);
+                log.setReadable(true);
+            }
+            try (FileOutputStream fs = new FileOutputStream(log, true))
+            {
+                DataOutputStream ds = new DataOutputStream(fs);
+                ds.writeBytes(info + "\r\n");
+            }
+        }
+        catch (Exception e)
+        {
+            CrashReporter.logException(e);
+        }
+    }
+
     // check that user has walked less than 10 meters in 15 seconds
     private void checkStop(Location location)
     {
         if (m_last_location == null)
             return;
         long last_loc_time = m_last_location.getTime();
-        double dist = distance(m_last_location.getLatitude(), location.getLatitude(), m_last_location.getLongitude(), location.getLongitude());
-        if((dist <= MINIMUM_DISTANCE * 2) && ((location.getTime() - last_loc_time) > 15000))
+        double dist = distance(m_last_location.getLatitude(), location.getLatitude(),
+                               m_last_location.getLongitude(), location.getLongitude());
+        if ((dist <= MINIMUM_DISTANCE * 2) && ((location.getTime() - last_loc_time) > 15000))
         {
             Location loc = new Location(location);
-            loc.setTime(m_last_location.getTime());
-            writeStop(location);
+            loc.setTime(last_loc_time);
+            writeStop(loc);
         }
     }
 
@@ -265,19 +289,13 @@ public class TrackRecorder implements LocationListener
         }
 
         if (m_last_location == null)
-        {
-            m_last_location = location;
             return true;
-        }
-
-        checkStop(location);
 
         double distance = CommonUtils.distance(m_last_location.getLatitude(), location.getLatitude(), m_last_location.getLongitude(), location.getLongitude());
         if (distance > MINIMUM_DISTANCE)
         {
             m_total_distance += distance;
-            m_last_stop_time = 0;
-            m_stop_signal_sended = false;
+            checkStop(location);
             return true;
         }
         else

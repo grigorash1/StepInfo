@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.Arrays;
+import java.util.List;
 
 import ru.grigorash.stepinfo.R;
 import ru.grigorash.stepinfo.service.SensorListenerSvc;
@@ -53,12 +54,31 @@ public class TrackRenderer
         m_current_track = new Polyline();
         m_current_track.setGeodesic(true);
         m_current_track.getOutlinePaint().setColor(color);
-
+        m_map.getOverlays().add(m_current_track);
         initFromFile(initial_file);
         if (!StringUtils.isEmpty(m_event_type))
             initBroadcastReceiver();
-        m_map.getOverlays().add(m_current_track);
         m_map.invalidate();
+    }
+
+    public TrackRenderer(Activity parent, MapView map, List<RecordPosition> track_positions, int color)
+    {
+        m_map = map;
+        m_event_type = null;
+        m_parent = parent;
+
+        m_current_track = new Polyline();
+        m_current_track.setGeodesic(true);
+        m_current_track.getOutlinePaint().setColor(color);
+        m_map.getOverlays().add(m_current_track);
+        initFromPositions(track_positions);
+        m_map.invalidate();
+    }
+
+    private void initFromPositions(List<RecordPosition> track_positions)
+    {
+        for (RecordPosition pos :  track_positions)
+            m_current_track.addPoint(new GeoPoint(pos.lat, pos.lon));
     }
 
     private void initBroadcastReceiver()
@@ -111,6 +131,7 @@ public class TrackRenderer
         try (ITrackReader reader = TrackReaderFactory.getReader(initial_file))
         {
             ITrackRecord record = null;
+            RecordStop stop = null;
             while ((record = reader.read()) != null)
             {
                 switch (record.Type())
@@ -118,11 +139,15 @@ public class TrackRenderer
                     case TrackRecorder.RECORD_POSITION:
                         RecordPosition rp = (RecordPosition)record;
                         m_current_track.addPoint(new GeoPoint(rp.lat, rp.lon));
+                        if (stop != null)
+                        {
+                            GeoPoint startPoint = new GeoPoint(stop.lat, stop.lon);
+                            addStopMarker(m_parent, m_map, startPoint, rp.time - stop.time);
+                            stop = null;
+                        }
                         break;
                     case TrackRecorder.RECORD_STOP:
-                        RecordStop stop = (RecordStop)record;
-                        GeoPoint startPoint = new GeoPoint(stop.lat, stop.lon);
-                        addStopMarker(m_parent, m_map, startPoint);
+                        stop = (RecordStop)record;
                         break;
                 }
             }
@@ -133,7 +158,7 @@ public class TrackRenderer
         }
     }
 
-    public static void addStopMarker(Context ctx, MapView map, GeoPoint point)
+    public static void addStopMarker(Context ctx, MapView map, GeoPoint point, long stop_time)
     {
         Marker stopMarker = new Marker(map);
         stopMarker.setPosition(point);
@@ -141,6 +166,12 @@ public class TrackRenderer
         stopMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
         stopMarker.setIcon(ContextCompat.getDrawable(ctx, R.drawable.ic_stop));
         stopMarker.setId(String.format("stop_sign_%d", map.getOverlays().size()));
+        if (stop_time > 0)
+        {
+            int seconds = (int) ((stop_time / 1000) % 60);
+            int minutes = (int) ((stop_time / 1000) / 60);
+            stopMarker.setTitle(String.valueOf(minutes) + ":" + seconds);
+        }
         map.getOverlays().add(stopMarker);
     }
 }

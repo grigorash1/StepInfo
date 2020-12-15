@@ -210,6 +210,7 @@ public class TracksViewFragment extends Fragment
         Drawable d = getBitmapFromVectorDrawable(getActivity(), R.drawable.ic_race, 64, 64);
         m_finish_marker.setIcon(d);
         m_finish_marker.setId("finish_sign");
+        m_finish_marker.setInfoWindow(null);
         m_map.getOverlays().add(m_finish_marker);
         animateMarker();
     }
@@ -235,29 +236,4 @@ public class TracksViewFragment extends Fragment
         };
         m_handler.post(m_rotate_finish_marker);
     }
-/**
- public void animateMarker(final Marker marker, final GeoPoint toPosition) {
- final Handler handler = new Handler();
- final long start = SystemClock.uptimeMillis();
- Projection proj = map.getProjection();
- Point startPoint = proj.toPixels(marker.getPosition(), null);
- final IGeoPoint startGeoPoint = proj.fromPixels(startPoint.x, startPoint.y);
- final long duration = 500;
- final Interpolator interpolator = new LinearInterpolator();
- handler.post(new Runnable() {
-@Override
-public void run() {
-long elapsed = SystemClock.uptimeMillis() - start;
-float t = interpolator.getInterpolation((float) elapsed / duration);
-double lng = t * toPosition.getLongitude() + (1 - t) * startGeoPoint.getLongitude();
-double lat = t * toPosition.getLatitude() + (1 - t) * startGeoPoint.getLatitude();
-marker.setPosition(new GeoPoint(lat, lng));
-if (t < 1.0) {
-handler.postDelayed(this, 15);
-}
-map.postInvalidate();
-}
-});
- }
- */
 }

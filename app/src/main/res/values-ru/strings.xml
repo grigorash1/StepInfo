@@ -29,6 +29,12 @@
     <string name="save_track_message">Хотите сохранить это трек?</string>
     <string name="yes">Да</string>
     <string name="no">Нет</string>
-    <string name="track_length">Расст. %.2f км</string>
-    <string name="avg_track_speed">Ср. скорость %.2f км\ч</string>
+    <string name="track_length">🚶 %.2f км</string>
+    <string name="avg_track_speed">Ср. скорость %.2f км/ч</string>
+    <string name="select_track">Выбор трека</string>
+    <string name="delete_track_file">Удалить файл трека</string>
+    <string name="delete_track_title">Трек</string>
+    <string name="delete_track_message">Хотите удалить файл трека?</string>
+    <string name="remove_rival_track_caption">Трек соперника</string>
+    <string name="remove_rival_track_message">Хотите удалить трек соперника?</string>
 </resources>
